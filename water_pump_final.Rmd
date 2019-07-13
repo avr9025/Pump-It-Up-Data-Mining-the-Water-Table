@@ -1,0 +1,611 @@
+---
+title: "Water Pump EDA"
+author: "Amritha"
+date: "22 October 2018"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(corrplot)
+library(ggplot2)
+library(rpart)
+library(dplyr)
+library(caret)
+
+library(lubridate)
+
+wp_1<-read.csv("E://College stuff//SEM 3//Final project//Tanzania water pump//Training set labels.csv",na.strings = c("NA",""))
+wp_2<-read.csv("E://College stuff//SEM 3//Final project//Tanzania water pump//Training set values.csv",na.strings = c("NA",""))
+
+## Merge both dataframes
+
+wp_train<-merge(wp_1,wp_2)
+
+head(wp_train)
+View((wp_train[1:5,]))
+names(wp_train)
+```
+
+
+```{r}
+
+class(wp_train$date_recorded)
+
+wp_train$date_recorded<-as.character(wp_train$date_recorded)
+wp_train$date_recorded<-as.Date(wp_train$date_recorded)
+head(wp_train$date_recorded)
+t<-ymd(wp_train$date_recorded)
+class(t)
+
+wp_train$year_recorded<-year(t)
+
+```
+
+## Distinguishing categorical and numeric columns
+
+```{r}
+d=function(x){
+num=sapply(x, is.numeric)
+fact=sapply(x,is.factor)
+return (list(names(x)[fact],names(x)[num]))
+}
+d(wp_train)
+```
+
+
+```{r}
+wp_train$amount_tsh[wp_train$amount_tsh==0]<-NA
+wp_train$gps_height[wp_train$gps_height==0]<-NA
+wp_train$construction_year[wp_train$construction_year==0]<-NA
+wp_train$num_private<-NULL
+wp_train$population[wp_train$population==0]<-NA
+
+
+wp_train$funder[wp_train$funder==0]<-NA
+wp_train$installer[wp_train$installer==0]<-NA
+wp_train$district_code[wp_train$district_code==0]<-NA
+
+#wp_train$construction_year<-as.factor(wp_train$construction_year)
+
+
+```
+
+## Summary of dataset
+
+```{r}
+summary(wp_train)
+```
+
+
+
+
+##  Percentage of missing values
+
+```{r}
+missing<-function(x){
+  sapply(x,function(y)sum(is.na(y))/length(y)*100)
+}
+missing(wp_train)
+```
+
+### Percentage of outliers
+
+```{r}
+outlier<-function(x){
+  num_col<-names(x)[sapply(x, is.numeric)]
+  x<-x[,num_col]
+  sapply(x,function(y)length(boxplot.stats(y)$out)/sum(!is.na(y))*100)
+}
+outlier(wp_train)
+
+```
+
+```{r}
+summary(wp_train)
+summary(wp_train$installer)
+summary(wp_train$gps_height)
+
+```
+
+
+
+## Checking frequency of the values in the target group
+
+```{r}
+table(wp_train$status_group)
+prop.table(table(wp_train$status_group))
+```
+
+## Checking proportion of status group against quantity
+
+```{r}
+table(wp_train$quantity,wp_train$status_group)
+prop.table(table(wp_train$quantity,wp_train$status_group))
+
+```
+
+
+## Plotting Categorical variables
+
+```{r}
+
+colnames(wp_train)
+
+
+ggplot(data=wp_train,aes(x=quantity_group,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+ggplot(data=wp_train,aes(x=quality_group,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+ggplot(data=wp_train,aes(x=extraction_type_class,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+ggplot(data=wp_train,aes(x=source_type,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+ggplot(data=wp_train,aes(x=waterpoint_type,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+ggplot(data=wp_train,aes(x=payment,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+
+ggplot(data=wp_train,aes(x=installer,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+ggplot(data=wp_train,aes(x=management_group,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+ggplot(data=wp_train,aes(x=permit,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+ggplot(data=wp_train,aes(x=as.factor(year_recorded),fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+    theme(legend.position = "top")
+
+
+
+#ggplot(data=wp_train,aes(x=construction_year,fill=status_group))+geom_bar()+theme_light()+ theme(axis.text.x = element_text(angle=65, vjust=0.6)) +  theme(legend.position = "top")
+
+
+```
+
+```{r}
+
+```
+
+
+## Plotting continuous variables
+
+```{r}
+
+boxplot(wp_train$amount_tsh)
+boxplot(wp_train$population)
+boxplot(wp_train$gps_height)
+
+ggplot(data = wp_train,aes(x=as.factor(status_group),y=amount_tsh))+geom_boxplot()
+ggplot(data = wp_train,aes(x=as.factor(status_group),y=population))+geom_boxplot()
+ggplot(data = wp_train,aes(x=as.factor(status_group),y=gps_height))+geom_boxplot()
+
+```
+
+```{r}
+
+ggplot(wp_train, aes(x = year_recorded)) + 
+  geom_histogram(bins = 20) + 
+  facet_grid( ~ status_group)+theme(axis.text.x = element_text(angle=75, vjust=0.6))
+
+
+ggplot(subset(wp_train, construction_year > 0), aes(x = construction_year)) +
+  geom_histogram(bins = 20) + 
+  facet_grid( ~ status_group)+theme(axis.text.x = element_text(angle=75, vjust=0.6))
+
+ggplot(wp_train, aes(x = amount_tsh)) + 
+  geom_histogram(bins = 20) + 
+  facet_grid( ~ status_group)+theme(axis.text.x = element_text(angle=75, vjust=0.6))
+
+ggplot(subset(wp_train, amount_tsh > 0), aes(x = amount_tsh)) +
+  geom_histogram(bins = 20) + 
+  facet_grid( ~ status_group)+ scale_x_continuous(labels = scales::comma)+theme(axis.text.x = element_text(angle=75, vjust=0.6))
+
+ggplot(wp_train, aes(x = gps_height)) + 
+  geom_histogram(bins = 20) + 
+  facet_grid( ~ status_group)
+
+ggplot(subset(wp_train, gps_height > 0), aes(x = gps_height)) +
+  geom_histogram(bins = 20) + 
+  facet_grid( ~ status_group)+ scale_x_continuous(labels = scales::comma)+theme(axis.text.x = element_text(angle=75, vjust=0.6))
+
+ggplot(subset(wp_train, gps_height > 500), aes(x = gps_height)) +
+  geom_histogram(bins = 20) + 
+  facet_grid( ~ status_group)+ scale_x_continuous(labels = scales::comma)+theme(axis.text.x = element_text(angle=75, vjust=0.6))
+
+
+ggplot(wp_train, aes(x = population)) + 
+  geom_histogram(bins = 10) + 
+  facet_grid( ~ status_group)+theme(axis.text.x = element_text(angle=75, vjust=0.6))
+
+
+ggplot(subset(wp_train, population < 9000), aes(x = population)) +
+  geom_histogram(bins = 8) + 
+  facet_grid( ~ status_group)+ scale_x_continuous(labels = scales::comma)+theme(axis.text.x = element_text(angle=75, vjust=0.6))
+
+
+
+
+```
+
+## 
+creating correlation matrix for numerical columns
+
+```{r}
+num<-dplyr::select_if(wp_train, is.numeric)
+
+C<-cor(na.omit(num))
+
+corrplot(C,method="circle")
+```
+
+```{r}
+
+## removing amount column since it has 70% missing values
+wp_train$amount_tsh<-NULL
+
+wp_train$gps_height[which(is.na(wp_train$gps_height))]<-mean(wp_train$gps_height,na.rm = T)
+
+wp_train$population[which(is.na(wp_train$population))]<-median(wp_train$population,na.rm=T)
+
+
+
+
+```
+
+
+```{r}
+
+# 
+
+wp_train %>% select(funder) %>% group_by(funder) %>% summarise(count=n()) %>%  top_n(5)
+
+
+wp_train$funder<-as.character(wp_train$funder)
+wp_train$funder[which(is.na(wp_train$funder))]<-"Government of Tanzania"
+wp_train$funder<-as.factor(wp_train$funder)
+
+wp_train$installer
+wp_train %>% select(installer) %>% group_by(installer) %>% summarise(count=n()) %>%  top_n(5)
+
+wp_train %>% select(scheme_management) %>% group_by(scheme_management ) %>% summarise(count=n()) %>%  top_n(5)
+
+wp_train %>% select(scheme_name) %>% group_by(scheme_name) %>% summarise(count=n()) %>%  top_n(5)
+
+wp_train %>% select(permit) %>% group_by(permit) %>% summarise(count=n()) %>%  top_n(5)
+
+wp_train %>% select(construction_year) %>% group_by(construction_year) %>% summarise(count=n()) %>%  top_n(5)
+
+```
+
+```{r}
+wp_test<-read.csv("E://College stuff//SEM 3//Final project//Tanzania water pump//Test set values.csv")
+
+```
+
+
+
+```{r}
+wp_test$amount_tsh[wp_test$amount_tsh==0]<-NA
+wp_test$gps_height[wp_test$gps_height==0]<-NA
+wp_test$construction_year[wp_test$construction_year==0]<-NA
+wp_test$num_private<-NULL
+wp_test$population[wp_test$population==0]<-NA
+
+
+wp_test$funder[wp_test$funder==0]<-NA
+wp_test$installer[wp_test$installer==0]<-NA
+wp_test$district_code[wp_test$district_code==0]<-NA
+#wp_test$construction_year[wp_test$construction_year==0]<-NA
+#wp_test$construction_year<-as.factor(wp_test$construction_year)
+
+
+```
+
+```{r}
+
+class(wp_test$date_recorded)
+
+wp_test$date_recorded<-as.character(wp_test$date_recorded)
+wp_test$date_recorded<-as.Date(wp_test$date_recorded)
+head(wp_test$date_recorded)
+t<-ymd(wp_test$date_recorded)
+class(t)
+
+wp_test$year_recorded<-year(t)
+
+```
+
+## Distinguishing categorical and numeric columns
+
+```{r}
+d=function(x){
+  num=sapply(x, is.numeric)
+  fact=sapply(x,is.factor)
+  return (list(names(x)[fact],names(x)[num]))
+}
+d(wp_test)
+```
+
+## Summary of dataset
+
+```{r}
+summary(wp_test)
+```
+
+
+
+
+##  Percentage of missing values
+
+```{r}
+missing<-function(x){
+  sapply(x,function(y)sum(is.na(y))/length(y)*100)
+}
+missing(wp_test)
+```
+
+### Percentage of outliers
+
+```{r}
+outlier<-function(x){
+  num_col<-names(x)[sapply(x, is.numeric)]
+  x<-x[,num_col]
+  sapply(x,function(y)length(boxplot.stats(y)$out)/sum(!is.na(y))*100)
+}
+outlier(wp_test)
+
+```
+
+```{r}
+summary(wp_test)
+summary(wp_test$installer)
+summary(wp_test$gps_height)
+
+```
+
+
+
+## Checking frequency of the values in the target group
+
+## Plotting continuous variables
+
+```{r}
+boxplot(wp_test$amount_tsh)
+boxplot(wp_test$population)
+boxplot(wp_test$gps_height)
+
+```
+
+
+
+## 
+creating correlation matrix for numerical columns
+
+```{r}
+num<-dplyr::select_if(wp_test, is.numeric)
+
+C<-cor(na.omit(num))
+
+corrplot(C,method="circle")
+```
+
+```{r}
+
+## removing amount column since it has 70% missing values
+wp_test$amount_tsh<-NULL
+
+wp_test$gps_height[which(is.na(wp_test$gps_height))]<-mean(wp_test$gps_height,na.rm = T)
+
+wp_test$population[which(is.na(wp_test$population))]<-median(wp_test$population,na.rm=T)
+
+```
+
+```{r}
+## Decision tree
+library(rpart)
+model_tree <- rpart(as.factor(status_group)~quantity_group+quality_group+extraction_type_class+source_type+waterpoint_type+payment+management_group+year_recorded+gps_height+population,data = wp_train)
+
+pred_dec_tree <- predict(model_tree, wp_train,type = "class")
+
+wp_test$status_group<-NA
+wp_test$status_group<-predict(model_tree,wp_test,type = "class")
+
+head(wp_test)
+
+head(wp_test$status_group)
+
+submission1<-NA
+submission1<-wp_test %>% select(id,status_group)
+
+head(submission1)
+
+write.csv(submission1,"E://College stuff//SEM 3//Final project//Tanzania water pump//submission1.csv",row.names=FALSE)
+
+```
+
+```{r}
+library(randomForest)
+
+mtry = round(sqrt(length(colnames(wp_train))-1))
+model_rf <- randomForest(status_group~quantity_group+quality_group+extraction_type_class+source_type+waterpoint_type+payment+management_group+year_recorded+gps_height+population,data = wp_train,ntree = 300,mtry = mtry)
+
+pred_model_rf<-predict(model_rf,wp_train)
+
+wp_test$status_group<-NA
+wp_test$status_group <- predict(model_rf,wp_test)
+
+
+submission2<-wp_test %>% select(id,status_group)
+
+head(submission2)
+
+write.csv(submission2,"E://College stuff//SEM 3//Final project//Tanzania water pump//submission2.csv",row.names=FALSE)
+```
+
+```{r}
+library(caret)
+
+class(pred_dec_tree)
+pred_dec_tree<-as.factor(pred_dec_tree)
+# confuision matrix 1
+confusionMatrix(pred_dec_tree, wp_train$status_group)
+
+# confuision matrix 2
+confusionMatrix(pred_model_rf, wp_train$status_group)
+
+
+# variable importance 
+
+importance(model_rf)
+
+varImpPlot(model_rf)
+
+```
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+
+# Observe the installer variable
+
+
+wp_train$install_3 <- substr(tolower(wp_train$installer),1,3)
+wp_train$install_3[wp_train$install_3 %in% c(" ", "", "0", "_", "-")] <- "other"
+
+# Take the top 15 substrings from above by occurance frequency
+install_top_15 <- names(summary(as.factor(wp_train$install_3)))[1:15]
+wp_train$install_3[!(wp_train$install_3 %in% install_top_15)] <- "other"
+wp_train$install_3 <- as.factor(wp_train$install_3)
+
+# Table of the install_3 variable vs the status of the pumps
+table(wp_train$install_3, wp_train$status_group)
+
+# As row-wise proportions, install_3 vs status_group
+prop.table(table(wp_train$install_3, wp_train$status_group), margin = 1)
+
+# Create install_3 for the test set using same top 15 from above
+wp_test$install_3 <- substr(tolower(wp_test$installer),1,3)
+wp_test$install_3[wp_test$install_3 %in% c(" ", "", "0", "_", "-")] <- "other"
+wp_test$install_3[!(wp_test$install_3 %in% install_top_15)] <- "other"
+wp_test$install_3 <- as.factor(wp_test$install_3)
+
+```
+
+```{r}
+
+set.seed(42)
+# model_forest <- randomForest(as.factor(status_group) ~ longitude + latitude + extraction_type_group + quantity + waterpoint_type + construction_year + install_3,
+#                              data = wp_train,
+#                              ntree = 800, mtry=mtry)
+# 
+
+#set.seed(42)
+# model_forest_1 <- randomForest(as.factor(status_group) ~ longitude + latitude + extraction_type_group + quality_group + quantity + waterpoint_type + construction_year + source_type  + water_quality + population + install_3, data = wp_train, ntree = 800, mtry=mtry)
+# 
+# 
+# 
+# # Predict using the training values
+# pred_forest_train <- predict(model_forest, wp_train)
+# 
+# importance(model_forest)
+# 
+# confusionMatrix(pred_forest_train, train$status_group)
+# 
+# # Predict using the training values number 2
+# pred_forest_train_1 <- predict(model_forest_1, wp_train)
+# 
+# importance(model_forest_1)
+# 
+# confusionMatrix(pred_forest_train_1, train$status_group)
+
+# Predict using the test values
+# pred_forest_test <- predict(model_forest, wp_test)
+# 
+# # Predict using the test values number 2
+# pred_forest_test_1 <- predict(model_forest_1, wp_test)
+
+model_forest_2 <- randomForest(status_group~quantity_group+longitude + latitude+quality_group+extraction_type_class+source_type+waterpoint_type+payment+management_group+year_recorded+gps_height+population+ source_type  + water_quality+install_3,data = wp_train,ntree = 700,mtry = mtry)
+
+wp_test$status_group<-NA
+wp_test$status_group<-predict(model_forest_2,wp_test)
+
+pred_forest_test_2<-predict(model_forest_2,wp_test,type="class")
+
+#confusionMatrix(pred_forest_test_2, wp_train$status_group)
+submission_3<-wp_test %>% select(id,status_group)
+
+#write.csv(submission_3, file = "E://College stuff//SEM 3//Final project//Tanzania water pump//submission_new3.csv",row.names=FALSE)
+
+head(submission_3)
+
+prop.table(table(wp_test$status_group))
+
+```
+
+```{r}
+
+# Create submission data frame
+#submission<-NA
+#submission <-data.frame(test$id)
+#test$status_group<-NA
+
+#test$status_group<-predict(model_forest, test)
+
+#submission<-test %>% select(id,status_group)
+
+#submission$status_group <- pred_forest_test
+#names(submission)[1] <- "id"
+#names(submission)[2]<-"status_group"
+
+#head(submission)
+#View(submission)
+#names(pred_forest_test)
+
+# Create submission data frame
+#submission_1<-NA
+#submission_1 <- data.frame(test$id)
+#submission$status_group <- pred_forest_test_1
+#names(submission)[1] <- "id"
+#names(submission)[2]<-"status_group"
+
+#names(submission)
+
+#test$status_group<-NA
+#test$status_group<-predict(model_forest_1, test)
+
+#submission_1<-test %>% select(id,status_group)
+
+#head(submission_1)
+# submission csv
+#write.csv(submission, file = "E://College stuff//SEM 3//Final project//Tanzania water pump//submission_new1.csv",row.names=FALSE)
+
+  # submission csv 2
+#write.csv(submission_1, file = "E://College stuff//SEM 3//Final project//Tanzania water pump//submission_new2.csv",row.names=FALSE)
+
+```
+
+
+
